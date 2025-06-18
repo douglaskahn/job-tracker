@@ -1,1 +1,10 @@
 env/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore database files
+jobtracker.db
+
+# Ignore uploads directory
+uploads/
