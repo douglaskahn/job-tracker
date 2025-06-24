@@ -1,10 +1,38 @@
+# Python
 env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
 
-# Ignore macOS system files
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
 
-# Ignore database files
-jobtracker.db
+# VS Code
+.vscode/
 
-# Ignore uploads directory
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Uploads directory
 uploads/
+
+# Backup files
+*.bak
+
+# Environment variables
+.env
