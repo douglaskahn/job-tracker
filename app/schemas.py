@@ -33,20 +33,42 @@ class ApplicationCreate(BaseModel):
         from_attributes = True
 
 class ApplicationUpdate(BaseModel):
-    company: Optional[str] = None
-    role: Optional[str] = None
-    url: Optional[str] = None
-    status: Optional[str] = None
-    application_date: Optional[str] = None
-    met_with: Optional[str] = None
-    notes: Optional[str] = None
-    resume_file: Optional[str] = None
-    cover_letter_file: Optional[str] = None
-    order_number: Optional[int] = None
-    follow_up_required: Optional[bool] = None
-    pros: Optional[str] = None
-    cons: Optional[str] = None
-    salary: Optional[str] = None
+    company: Optional[str] = Field(None)
+    role: Optional[str] = Field(None)
+    url: Optional[str] = Field(None)
+    status: Optional[str] = Field(None)
+    application_date: Optional[str] = Field(None)
+    met_with: Optional[str] = Field(None)
+    notes: Optional[str] = Field(None)
+    resume_file: Optional[str] = Field(None)
+    cover_letter_file: Optional[str] = Field(None)
+    order_number: Optional[int] = Field(None)
+    follow_up_required: Optional[bool] = Field(None)
+    pros: Optional[str] = Field(None)
+    cons: Optional[str] = Field(None)
+    salary: Optional[str] = Field(None)
+
+    @field_validator('company', 'role', 'status')
+    def validate_required_fields(cls, v, field):
+        if v is None or v.strip() == '':
+            raise ValueError(f"{field.name} cannot be empty")
+        return v.strip()
+
+    @field_validator('url', 'met_with', 'notes', 'pros', 'cons', 'salary')
+    def validate_optional_fields(cls, v):
+        """Convert empty strings or whitespace-only strings to None for optional fields."""
+        if v is None or (isinstance(v, str) and v.strip() == ''):
+            return None
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator('application_date')
+    def validate_date(cls, v):
+        if v is not None and v.strip():
+            try:
+                return normalize_date(v)
+            except ValueError as e:
+                raise ValueError(f"Invalid date format: {v}")
+        return None
 
     class Config:
         from_attributes = True
