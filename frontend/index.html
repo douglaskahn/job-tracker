@@ -1,94 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Tracker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom styles for better alignment with the visual comp */
-        #application-form {
-            transition: all 0.3s ease-in-out;
-        }
-        #job-list .job-item {
-            border-bottom: 1px solid #e5e7eb;
-            padding: 1rem 0;
-        }
-        #job-list .job-item:last-child {
-            border-bottom: none;
-        }
-    </style>
-</head>
-<body class="bg-gray-50 text-gray-900">
-    <header class="bg-gradient-to-r from-blue-500 to-blue-700 text-white py-6 shadow-md">
-        <h1 class="text-center text-3xl font-extrabold tracking-wide">Job Tracker</h1>
-    </header>
-    <main class="p-6 max-w-4xl mx-auto">
-        <button id="toggle-form" class="mb-6 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition">
-            + Add New Application
-        </button>
-        <form id="application-form" class="hidden bg-white shadow-lg rounded-lg p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input type="text" id="company" placeholder="Company Name" class="border p-2 rounded" required>
-                <input type="text" id="role" placeholder="Role / Job Title" class="border p-2 rounded" required>
-                <input type="url" id="job-url" placeholder="Job Posting URL" class="border p-2 rounded">
-                <select id="status" class="border p-2 rounded" required>
-                    <option value="" disabled selected>Application Status</option>
-                    <option>Not Yet Applied</option>
-                    <option>Applied</option>
-                    <option>Interviewing</option>
-                    <option>Offer</option>
-                    <option>Rejected</option>
-                    <option>No Longer Listed</option>
-                    <option>Decided not to apply</option>
-                    <option>Declined Offer</option>
-                    <option>Accepted</option>
-                    <option>Applied / No Longer Listed</option>
-                </select>
-                <input type="date" id="application-date" class="border p-2 rounded">
-                <input type="text" id="met-with" placeholder="Met With" class="border p-2 rounded">
-                <textarea id="notes" placeholder="Notes" class="border p-2 rounded"></textarea>
-                <label class="flex items-center">
-                    <input type="checkbox" id="follow-up" class="mr-2"> Follow-Up Required
-                </label>
-                <textarea id="pros" placeholder="Pros" class="border p-2 rounded"></textarea>
-                <textarea id="cons" placeholder="Cons" class="border p-2 rounded"></textarea>
-                <input type="text" id="salary" placeholder="Salary" class="border p-2 rounded">
-                <input type="file" id="resume" accept=".pdf,.doc,.docx" class="border p-2 rounded">
-                <input type="file" id="cover-letter" accept=".pdf,.doc,.docx" class="border p-2 rounded">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition">
-                    Submit Application
-                </button>
-            </div>
-        </form>
-        <div id="job-list" class="bg-white shadow-lg rounded-lg p-6">
-            <h2 class="text-xl font-bold mb-4">Job Applications</h2>
-            <div class="job-item">
-                <!-- Example job item -->
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h3 class="text-lg font-semibold">Company Name</h3>
-                        <p class="text-sm text-gray-600">Role / Job Title</p>
-                    </div>
-                    <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded shadow-md transition">
-                        View Details
-                    </button>
-                </div>
-            </div>
-            <!-- Additional job items will be dynamically added here -->
-        </div>
-    </main>
-    <div id="modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl p-8 w-3/4 md:w-1/2">
-            <h2 class="text-2xl font-bold mb-6">Application Details</h2>
-            <div id="modal-content">
-                <!-- Modal content will be dynamically populated here -->
-            </div>
-            <button id="close-modal" class="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg shadow-md transition">
-                Close
-            </button>
-        </div>
-    </div>
-    <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Application Tracker</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

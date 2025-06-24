@@ -1,0 +1,1 @@
+// Moved from nested frontend/src/assets/
