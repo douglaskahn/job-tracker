@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from app.demo_models import DemoApplication
+from demo_models import DemoApplication
 import os
 from uuid import uuid4
 import logging

@@ -9,17 +9,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from app import models, crud, schemas, demo_models
-from app.database import engine, SessionLocal
-from app.demo_routes import router as demo_router
-from app import demo_data
+# Import directly when running main.py directly, without using it as a package
+import models
+import crud
+import schemas
+import demo_models
+from database import engine, SessionLocal
+from demo_routes import router as demo_router
+import demo_data
 
 app = FastAPI()
 
 # CORS middleware for frontend/backend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],  # Allow various dev server ports
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:4000"],  # Allow various dev server ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -345,3 +349,78 @@ def get_demo_applications():
             "updated_at": None
         }
     ]
+
+# File upload endpoint for individual files
+@app.post("/applications/{app_id}/files/{file_type}")
+async def upload_file(
+    app_id: int,
+    file_type: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a file for an existing application."""
+    try:
+        # Validate file type
+        if file_type not in ['resume', 'cover_letter']:
+            raise HTTPException(status_code=400, detail="Invalid file type. Must be 'resume' or 'cover_letter'")
+        
+        # Get existing application
+        existing_app = crud.get_application(db, application_id=app_id)
+        if existing_app is None:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+        # Save the file
+        async def save_file(upload_file: UploadFile, folder: str) -> str:
+            unique_id = str(uuid4())[:8]
+            file_extension = os.path.splitext(upload_file.filename or "file")[1]
+            filename = f"{unique_id}_{upload_file.filename or 'file'}"
+            file_path = os.path.join(folder, filename)
+            
+            with open(file_path, "wb") as buffer:
+                content = await upload_file.read()
+                buffer.write(content)
+            
+            return filename
+
+        # Save the uploaded file
+        filename = await save_file(file, UPLOAD_FOLDER)
+        
+        # Update the application with the new file path
+        if file_type == 'resume':
+            existing_app.resume_file = filename
+        elif file_type == 'cover_letter':
+            existing_app.cover_letter_file = filename
+        
+        # Update the application in the database
+        update_data = {
+            'company': existing_app.company,
+            'role': existing_app.role,
+            'status': existing_app.status,
+            'url': existing_app.url,
+            'application_date': existing_app.application_date,
+            'notes': existing_app.notes,
+            'pros': existing_app.pros,
+            'cons': existing_app.cons,
+            'salary': existing_app.salary,
+            'follow_up_required': existing_app.follow_up_required,
+            'resume_file': existing_app.resume_file,
+            'cover_letter_file': existing_app.cover_letter_file,
+            'met_with': existing_app.met_with
+        }
+        app_update = schemas.ApplicationUpdate(**update_data)
+        updated_app = crud.update_application(db, app_id, app_update)
+        
+        return {"message": f"{file_type} uploaded successfully", "filename": filename}
+        
+    except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+
+# Direct execution support for app/main.py
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    
+    port = int(os.environ.get("PORT", 8005))
+    print(f"Starting server on port {port}")
+    uvicorn.run(app, host="127.0.0.1", port=port)

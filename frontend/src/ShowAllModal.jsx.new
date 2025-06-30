@@ -1,0 +1,466 @@
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+  IconButton,
+  TextField,
+  InputAdornment,
+  Typography,
+  Tooltip,
+  Menu,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  Alert,
+  Chip,
+  CircularProgress
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  Search as SearchIcon,
+  ViewColumn as ViewColumnIcon,
+  CloudDownload as CloudDownloadIcon,
+  Visibility as VisibilityIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
+import { DataGrid, GridActionsCellItem } from '@mui/x-data-grid';
+import { saveAs } from 'file-saver';
+
+const ShowAllModal = ({
+  open,
+  onClose,
+  rows,
+  applications, // Alternative to rows
+  columns = [], // Provide default empty array
+  onView,
+  visibleColumns = [], // Provide default empty array
+  setVisibleColumns = () => {}, // Provide default no-op function
+  onEdit,
+  onDelete,
+  loading = false,
+  demoMode = false
+}) => {
+  const [error, setError] = useState('');
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortModel, setSortModel] = useState([]);
+  const [isExporting, setIsExporting] = useState(false);
+  
+  // Use applications if rows not provided
+  const dataRows = rows || applications || [];
+  
+  // Default column visibility
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState(() => {
+    // Default all columns to visible in "Show All" view
+    const allColumnsVisible = {};
+    if (columns && Array.isArray(columns)) {
+      columns.forEach(col => {
+        allColumnsVisible[col.field] = true;
+      });
+    } else if (dataRows.length > 0) {
+      // If no columns provided, use the keys from the first row
+      Object.keys(dataRows[0] || {}).forEach(key => {
+        allColumnsVisible[key] = true;
+      });
+    }
+    return allColumnsVisible;
+  });
+  
+  // Status color mapping
+  const statusColors = {
+    'Not Yet Applied': 'default',
+    'Applied': 'warning',
+    'Interviewing': 'orange',
+    'Offer': 'success',
+    'Rejected': 'error',
+    'No Longer Listed': 'default',
+    'Decided not to apply': 'secondary',
+    'Declined Offer': 'default',
+    'Accepted': 'primary',
+    'Applied / No Longer Listed': 'default',
+  };
+
+  // Enhanced filtering with type checking
+  const filteredRows = React.useMemo(() => {
+    return dataRows.filter(row => {
+      // If no search term, return all rows
+      if (!searchTerm) return true;
+      
+      // Check if any visible field contains the search term
+      return Object.entries(row).some(([key, value]) => {
+        if (visibleColumns.length > 0 && !visibleColumns.includes(key)) return false;
+        if (value == null) return false;
+        
+        try {
+          const stringValue = String(value).toLowerCase();
+          const search = searchTerm.toLowerCase();
+          return stringValue.includes(search);
+        } catch (e) {
+          console.error("Error comparing values:", e);
+          return false;
+        }
+      });
+    });
+  }, [dataRows, searchTerm, visibleColumns]);
+
+  // Handle data export with error handling
+  const handleExport = () => {
+    setIsExporting(true);
+    setError('');
+    try {
+      // Determine which columns to include
+      let exportColumns = columns;
+      if (!exportColumns || !exportColumns.length) {
+        // Generate columns from data if none provided
+        if (dataRows.length > 0) {
+          const firstRow = dataRows[0];
+          exportColumns = Object.keys(firstRow || {}).map(key => ({
+            field: key,
+            headerName: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')
+          }));
+        } else {
+          throw new Error('No data available to export');
+        }
+      }
+      
+      // Filter to visible columns only
+      const visibleCols = exportColumns.filter(col => 
+        !columnVisibilityModel || columnVisibilityModel[col.field]
+      );
+      
+      // Create CSV header
+      const header = visibleCols.map(col => `"${col.headerName || col.field}"`).join(',');
+      
+      // Create CSV rows
+      const csvRows = filteredRows.map(row =>
+        visibleCols.map(col => {
+          const value = row[col.field];
+          if (value == null) return '""';
+          if (col.field === 'status') return `"${value}"`;
+          if (typeof value === 'boolean') return value ? '"Yes"' : '"No"';
+          return `"${String(value).replace(/"/g, '""')}"`;
+        }).join(',')
+      );
+      
+      // Combine header and rows
+      const csv = [header, ...csvRows].join('\n');
+      
+      // Create and download blob
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      saveAs(blob, `job_applications_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (error) {
+      setError('Failed to export data: ' + (error.message || 'Unknown error'));
+      console.error('Export error:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Generate columns if none provided
+  const generatedColumns = React.useMemo(() => {
+    if (columns && columns.length > 0) {
+      return columns;
+    }
+    
+    // Try to generate columns from data
+    if (dataRows.length > 0) {
+      const firstRow = dataRows[0];
+      return Object.keys(firstRow || {})
+        .filter(key => key !== 'id') // Exclude id field from display
+        .map(key => ({
+          field: key,
+          headerName: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+          flex: 1,
+          minWidth: 120
+        }));
+    }
+    
+    return [];
+  }, [columns, dataRows]);
+
+  // Enhanced columns with actions
+  const enhancedColumns = React.useMemo(() => {
+    const baseColumns = generatedColumns.map(col => ({
+      ...col,
+      flex: 1,
+      minWidth: 120,
+      sortable: true,
+      filterable: true,
+      hideable: true,
+      renderCell: (params) => {
+        const value = params.value;
+        if (value == null) return '';
+        
+        // Special rendering for status field with color chips
+        if (params.field === 'status') {
+          return (
+            <Chip 
+              label={value}
+              color={statusColors[value] || 'default'}
+              size="small"
+              sx={{ fontWeight: 'medium' }}
+            />
+          );
+        }
+        
+        // Special rendering for boolean values
+        if (typeof value === 'boolean') {
+          return value ? 'Yes' : 'No';
+        }
+        
+        // Default rendering
+        try {
+          return String(value);
+        } catch (e) {
+          console.error("Error rendering cell value:", e);
+          return '(error)';
+        }
+      }
+    }));
+    
+    // Add actions column if handlers are provided
+    if (onView || onEdit || onDelete) {
+      return [
+        ...baseColumns,
+        {
+          field: 'actions',
+          headerName: 'Actions',
+          width: 120,
+          sortable: false,
+          filterable: false,
+          renderCell: (params) => {
+            const actions = [];
+            
+            if (onView) {
+              actions.push(
+                <GridActionsCellItem
+                  key="view"
+                  icon={<VisibilityIcon />}
+                  label="View"
+                  onClick={() => onView(params.row)}
+                />
+              );
+            }
+            
+            if (onEdit) {
+              actions.push(
+                <GridActionsCellItem
+                  key="edit"
+                  icon={<EditIcon />}
+                  label="Edit"
+                  onClick={() => onEdit(params.row)}
+                />
+              );
+            }
+            
+            if (onDelete) {
+              actions.push(
+                <GridActionsCellItem
+                  key="delete"
+                  icon={<DeleteIcon />}
+                  label="Delete"
+                  onClick={() => onDelete(params.row.id)}
+                />
+              );
+            }
+            
+            return actions;
+          }
+        }
+      ];
+    }
+    
+    return baseColumns;
+  }, [generatedColumns, statusColors, onView, onEdit, onDelete]);
+
+  // Column menu handlers
+  const handleColumnMenuOpen = (event) => {
+    setColumnMenuAnchor(event.currentTarget);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchor(null);
+  };
+
+  const handleColumnVisibilityChange = (field) => {
+    setColumnVisibilityModel(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+    handleColumnMenuClose();
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: {
+          height: '90vh',
+          display: 'flex',
+          flexDirection: 'column'
+        }
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h6">All Applications</Typography>
+        <Box>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent sx={{ flexGrow: 1, p: 1 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        )}
+        
+        <Box sx={{ display: 'flex', mb: 2, gap: 1, alignItems: 'center' }}>
+          <TextField
+            placeholder="Search applications..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            variant="outlined"
+            size="small"
+            sx={{ flexGrow: 1 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton 
+                    size="small" 
+                    onClick={handleClearSearch}
+                    edge="end"
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+          
+          <Tooltip title="Show/hide columns">
+            <IconButton onClick={handleColumnMenuOpen} size="small">
+              <ViewColumnIcon />
+            </IconButton>
+          </Tooltip>
+          
+          <Tooltip title="Export to CSV">
+            <span>
+              <IconButton 
+                onClick={handleExport} 
+                size="small"
+                disabled={isExporting || dataRows.length === 0}
+              >
+                {isExporting ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <CloudDownloadIcon />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+        
+        <Menu
+          anchorEl={columnMenuAnchor}
+          open={Boolean(columnMenuAnchor)}
+          onClose={handleColumnMenuClose}
+        >
+          {enhancedColumns
+            .filter(col => col.field !== 'actions')
+            .map(col => (
+              <MenuItem 
+                key={col.field} 
+                onClick={() => handleColumnVisibilityChange(col.field)}
+                dense
+              >
+                <Checkbox 
+                  size="small" 
+                  checked={columnVisibilityModel[col.field] || false}
+                />
+                <ListItemText primary={col.headerName || col.field} />
+              </MenuItem>
+            ))}
+        </Menu>
+        
+        <Box sx={{ height: '100%', width: '100%' }}>
+          {dataRows.length === 0 ? (
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              height: '100%',
+              flexDirection: 'column',
+              gap: 2
+            }}>
+              {loading ? (
+                <>
+                  <CircularProgress />
+                  <Typography>Loading applications...</Typography>
+                </>
+              ) : (
+                <>
+                  <Typography variant="h6">No applications found</Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {searchTerm ? 'Try adjusting your search terms' : 'Add some applications to get started'}
+                  </Typography>
+                </>
+              )}
+            </Box>
+          ) : (
+            <DataGrid
+              rows={filteredRows}
+              columns={enhancedColumns}
+              autoPageSize
+              sortingMode="client"
+              filterMode="client"
+              disableColumnMenu
+              columnVisibilityModel={columnVisibilityModel}
+              onColumnVisibilityModelChange={setColumnVisibilityModel}
+              sortModel={sortModel}
+              onSortModelChange={setSortModel}
+              loading={loading}
+              sx={{
+                '& .MuiDataGrid-cell': {
+                  whiteSpace: 'normal',
+                  lineHeight: 'normal',
+                  p: 1,
+                },
+                '& .MuiDataGrid-columnHeader': {
+                  backgroundColor: 'background.paper',
+                  fontWeight: 'bold',
+                },
+                border: 'none'
+              }}
+            />
+          )}
+        </Box>
+      </DialogContent>
+      
+      <DialogActions>
+        <Button onClick={onClose} color="primary">
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default ShowAllModal;

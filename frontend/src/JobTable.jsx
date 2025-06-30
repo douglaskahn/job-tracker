@@ -5,6 +5,7 @@ import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { saveAs } from 'file-saver';
+import config from './config';
 
 const statusColors = {
   'Not Yet Applied': 'default',
@@ -17,6 +18,28 @@ const statusColors = {
   'Declined Offer': 'default',
   'Accepted': 'primary',
   'Applied / No Longer Listed': 'default',
+};
+
+// Render function for resume file links
+const renderResumeLink = (params) => {
+  if (!params.value) return <span style={{ color: '#aaa' }}>N/A</span>;
+  
+  return (
+    <a href={`${config.api.baseURL}/uploads/${params.value}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'underline' }}>
+      See Resume
+    </a>
+  );
+};
+
+// Render function for cover letter links
+const renderCoverLetterLink = (params) => {
+  if (!params.value) return <span style={{ color: '#aaa' }}>N/A</span>;
+  
+  return (
+    <a href={`${config.api.baseURL}/uploads/${params.value}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'underline' }}>
+      See Cover Letter
+    </a>
+  );
 };
 
 const columns = [
@@ -39,20 +62,8 @@ const columns = [
   { field: 'application_date', headerName: 'Date Applied', width: 120 },
   { field: 'met_with', headerName: 'Met With', width: 140 },
   { field: 'notes', headerName: 'Notes', width: 180 },
-  { field: 'resume_file', headerName: 'Resume', width: 120, renderCell: (params) =>
-    params.value ? (
-      <a href={`/${params.value}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'underline' }}>
-        See Resume
-      </a>
-    ) : <span style={{ color: '#aaa' }}>N/A</span>
-  },
-  { field: 'cover_letter_file', headerName: 'Cover Letter', width: 120, renderCell: (params) =>
-    params.value ? (
-      <a href={`/${params.value}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'underline' }}>
-        See Cover Letter
-      </a>
-    ) : <span style={{ color: '#aaa' }}>N/A</span>
-  },
+  { field: 'resume_file', headerName: 'Resume', width: 120, renderCell: renderResumeLink },
+  { field: 'cover_letter_file', headerName: 'Cover Letter', width: 120, renderCell: renderCoverLetterLink },
   { field: 'pros', headerName: 'Pros', width: 120 },
   { field: 'cons', headerName: 'Cons', width: 120 },
   { field: 'salary', headerName: 'Salary', width: 100 },
@@ -158,6 +169,11 @@ const JobTable = ({
     );
   };
 
+  // State for sorting with default sort order
+  const [sortModel, setSortModel] = useState([
+    { field: config.defaultSortField, sort: config.defaultSortDirection }
+  ]);
+
   // Filtered and sorted rows
   const filteredRows = useMemo(() => {
     console.log(`JobTable processing ${sortedRows.length} applications`);
@@ -177,12 +193,39 @@ const JobTable = ({
     );
   }, [sortedRows, search, statusFilter, followUpFilter]);
 
-  const pagedRows = useMemo(() => 
-    filteredRows.slice(page * pageSize, (page + 1) * pageSize),
-    [filteredRows, page, pageSize]
+  // Apply custom sorting if sort model is defined
+  const sortedFilteredRows = useMemo(() => {
+    if (!sortModel.length) return filteredRows;
+    
+    return [...filteredRows].sort((a, b) => {
+      const { field, sort } = sortModel[0];
+      const aValue = a[field];
+      const bValue = b[field];
+      
+      // Handle undefined or null values
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return sort === 'asc' ? -1 : 1;
+      if (bValue == null) return sort === 'asc' ? 1 : -1;
+      
+      // Compare values based on sort direction
+      if (aValue < bValue) return sort === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sort === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredRows, sortModel]);
+
+  // Memoize columns and filtered columns for DataGrid stability
+  const memoizedColumns = useMemo(() => columns, []);
+  const filteredColumns = useMemo(
+    () => memoizedColumns.filter(col => visibleColumns.includes(col.field)),
+    [memoizedColumns, visibleColumns]
   );
 
-  const rowsWithView = pagedRows.map((row) => ({ ...row, onView }));
+  // Modify the filteredRows to include the onView callback for each row
+  const filteredRowsWithView = useMemo(() => 
+    sortedFilteredRows.map(row => ({ ...row, onView })),
+    [sortedFilteredRows, onView]
+  );
 
   // Unique status values for filter dropdown
   const statusOptions = useMemo(() => {
@@ -207,13 +250,6 @@ const JobTable = ({
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'applications_export.csv');
   }
-
-  // Memoize columns and filtered columns for DataGrid stability
-  const memoizedColumns = useMemo(() => columns, []);
-  const filteredColumns = useMemo(
-    () => memoizedColumns.filter(col => visibleColumns.includes(col.field)),
-    [memoizedColumns, visibleColumns]
-  );
 
   return (
     <Box maxWidth="lg" mx="auto" sx={{ width: '100%' }}>
@@ -275,7 +311,7 @@ const JobTable = ({
           <span><Button onClick={onClearFilters} color="secondary" variant="outlined">Clear</Button></span>
         </Tooltip>
         {/* Export CSV button */}
-        <Button variant="outlined" onClick={() => exportToCSV(filteredRows, filteredColumns)}>
+        <Button variant="outlined" onClick={() => exportToCSV(sortedFilteredRows, filteredColumns)}>
           Export CSV
         </Button>
       </Box>
@@ -283,14 +319,16 @@ const JobTable = ({
       <Box sx={{ overflowX: 'auto' }}>
         <Box sx={{ minWidth: '1000px' }}>
           <DataGrid
-            rows={rowsWithView}
+            rows={filteredRowsWithView.slice(page * pageSize, (page + 1) * pageSize)}
             columns={filteredColumns}
             pageSize={pageSize}
             rowsPerPageOptions={[]}
             pagination={false}
             hideFooter
-            onRowClick={(params) => onView(params.row)}
             disableSelectionOnClick
+            onRowClick={(params) => onView(params.row)}
+            sortModel={sortModel}
+            onSortModelChange={(model) => setSortModel(model)}
             getRowClassName={(params) => `status-${params.row.status?.toLowerCase().replace(/\s+/g, '-')}`}
             sx={{
               '& .MuiDataGrid-columnHeaders': { position: 'sticky', top: 0, background: '#fff', zIndex: 1 },
@@ -300,8 +338,8 @@ const JobTable = ({
               '& .MuiDataGrid-row:hover': { backgroundColor: '#f5f7fa' },
               '& .MuiDataGrid-cell': { borderBottom: '1px solid #e0e0e0' },
               fontSize: 15,
+              height: 650,
             }}
-            // autoHeight removed: use flex parent or set height via sx
           />
         </Box>
       </Box>

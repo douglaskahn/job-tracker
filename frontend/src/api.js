@@ -1,6 +1,8 @@
 import axios from 'axios';
+import config from './config';
 
-const API_BASE = 'http://localhost:8005';
+// Use the baseURL from config instead of hardcoding
+const API_BASE = config.api.baseURL;
 
 export const fetchApplications = async () => {
   const res = await axios.get(`${API_BASE}/applications/`);
@@ -11,8 +13,10 @@ export const createApplication = async (data, isDemoMode = false) => {
   try {
     // If data is FormData, set the correct headers for file upload
     const isFormData = (typeof FormData !== 'undefined') && data instanceof FormData;
-    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
-    const endpoint = isDemoMode ? `${API_BASE}/demo/applications/` : `${API_BASE}/applications/`;
+    const axiosConfig = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    const endpoint = isDemoMode 
+      ? `${API_BASE}/demo/applications/` 
+      : `${API_BASE}/applications/`;
     
     console.log('Creating application with isDemoMode:', isDemoMode);
     console.log('Endpoint:', endpoint);
@@ -28,7 +32,7 @@ export const createApplication = async (data, isDemoMode = false) => {
     }
     
     console.log('About to send POST request to:', endpoint);
-    const res = await axios.post(endpoint, data, config);
+    const res = await axios.post(endpoint, data, axiosConfig);
     console.log('Create application response:', res.data);
     return res.data;
   } catch (error) {

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, asc, desc
-from app import models, schemas
+import models, schemas
 from datetime import datetime
 from typing import Optional
 import os

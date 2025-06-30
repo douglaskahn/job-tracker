@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
-from app.database import get_db
-from app import demo_crud, demo_models, schemas
+from database import get_db
+import demo_crud, demo_models, schemas
 import logging
 import json
 

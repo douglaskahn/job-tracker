@@ -1,0 +1,23 @@
+{
+  "apps": [
+    {
+      "name": "job-tracker-backend",
+      "cwd": "/Users/douglaskahn/Documents/job-tracker",
+      "script": "./start-backend.sh",
+      "env": {
+        "PORT": "8005"
+      }
+    },
+    {
+      "name": "job-tracker-frontend",
+      "cwd": "/Users/douglaskahn/Documents/job-tracker",
+      "script": "./start-frontend.sh",
+      "env": {
+        "NODE_ENV": "development",
+        "VITE_API_BASE": "http://localhost:8005"
+      },
+      "wait_ready": true,
+      "kill_timeout": 3000
+    }
+  ]
+}

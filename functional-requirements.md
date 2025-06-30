@@ -313,10 +313,10 @@ The Job Application Tracker is a web-based system that helps users record, track
 
 - **Uploads:** Uploaded files are saved to the `uploads/` directory. Ensure this folder exists and is writable.
 - **Environment Variables:** If any secrets, API keys, or config values are needed, document them and use a `.env` file (with `python-dotenv` if needed).
-- **Port:** Backend runs on port `8000` by default. Change with the `--port` flag if needed.
+- **Port:** Backend runs on port `8005` by default. Change with the `--port` flag if needed.
 
 ### React Frontend
-- **API Base URL:** All API calls should point to the backend dev server (e.g., `http://localhost:8000`). This is set in `frontend/src/api.js`.
+- **API Base URL:** All API calls should point to the backend dev server (e.g., `http://localhost:8005`). This is set in `frontend/src/api.js`.
 - **Port:** Frontend runs on port `5173` by default (Vite). Change with the `--port` flag if needed.
 - **Proxy (optional):** If using a Vite proxy for API calls, document the config in `vite.config.js`.
 

@@ -1,0 +1,580 @@
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { ThemeProvider, CssBaseline, Box, Snackbar, Alert, CircularProgress, Button } from '@mui/material';
+import Sidebar from './Sidebar';
+import JobTable from './JobTable';
+import DemoToggle from './DemoToggle';
+import Dashboard from './pages/Dashboard';
+import VisualizationsPage from './pages/VisualizationsPage';
+import Settings from './pages/Settings';
+import ExportCSV from './pages/ExportCSV';
+import Calendar from './pages/Calendar';
+import BottomSpacer from './BottomSpacer';
+import theme from './theme';
+import {
+  fetchApplications,
+  createApplication,
+  updateApplication,
+  deleteApplication,
+  fetchDemoApplications,
+  fetchVisualizations,
+  uploadFile,
+} from './api';
+import { fetchApplicationsEnhanced } from './enhancedApi';
+import useSearch from './hooks/useSearch';
+import ApplicationViewModal from './ApplicationViewModal';
+import ApplicationFormModal from './ApplicationFormModal';
+import ShowAllModal from './ShowAllModal';
+import { initConfig } from './config';
+import { preventAllFormSubmissions } from './utils/eventHelpers';
+
+function App() {
+  // Initialize config and basic app state
+  const [configInitialized, setConfigInitialized] = useState(false);
+  const [page, setPage] = useState('applications');
+  const [applications, setApplications] = useState([]);
+  const [demoMode, setDemoMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Toast notifications state
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  // DataGrid state
+  const [visibleColumns, setVisibleColumns] = useState([
+    'company', 'role', 'url', 'status', 'application_date', 'follow_up_required'
+  ]);
+  const [tablePage, setTablePage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Sorting and filtering state
+  const [sortField, setSortField] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [followUpFilter, setFollowUpFilter] = useState('');
+
+  // Modal and selected item state
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [showAllModalOpen, setShowAllModalOpen] = useState(false);
+
+  // API state
+  const [lastError, setLastError] = useState(null);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [apiCallsEnabled, setApiCallsEnabled] = useState(true);
+
+  // Visualizations state
+  const [visualizationData, setVisualizationData] = useState({});
+  const [visualizationsLoading, setVisualizationsLoading] = useState(false);
+
+  // Initialize enhanced search hook
+  const {
+    searchTerm: search,
+    isSearching: searchLoading,
+    setSearchTerm: setSearch,
+    resetSearch
+  } = useSearch({
+    initialTerm: '',
+    debounceTime: 300,
+    // We do server-side search, so no custom search function
+  });
+
+  // Memoize the filtered rows list to avoid recalculations
+  const filteredRows = useMemo(() => {
+    if (!applications || !Array.isArray(applications)) {
+      console.error("Applications is not an array:", applications);
+      return [];
+    }
+    
+    return applications;
+  }, [applications]);
+
+  // Initialize config on mount
+  useEffect(() => {
+    const initializeConfig = async () => {
+      await initConfig();
+      setConfigInitialized(true);
+    };
+    
+    initializeConfig();
+  }, []);
+
+  // Memoize filter setters to prevent unnecessary re-renders
+  const memoizedSetStatusFilter = useCallback((value) => {
+    console.log(`App.jsx: Setting status filter to "${value}"`);
+    setStatusFilter(value);
+  }, []);
+  
+  const memoizedSetFollowUpFilter = useCallback((value) => {
+    console.log(`App.jsx: Setting follow-up filter to "${value}"`);
+    setFollowUpFilter(value);
+  }, []);
+  
+  const memoizedSetVisibleColumns = useCallback((value) => {
+    setVisibleColumns(value);
+  }, []);
+
+  // Load applications when dependencies change
+  useEffect(() => {
+    if (!configInitialized || !apiCallsEnabled) return;
+    
+    let didCancel = false;
+    
+    const loadApplications = async () => {
+      setLoading(true);
+      setLoadingMessage("Loading applications...");
+      
+      try {
+        let fetchFn = demoMode ? fetchDemoApplications : fetchApplicationsEnhanced;
+        
+        const response = await fetchFn({
+          page: tablePage,
+          pageSize,
+          sortField,
+          sortOrder,
+          search,
+          statusFilter,
+          followUpFilter
+        });
+        
+        if (!didCancel) {
+          setApplications(response.applications || []);
+          setTotalCount(response.totalCount || 0);
+          console.log(`Loaded ${response.applications?.length || 0} applications (${response.totalCount} total)`);
+        }
+      } catch (err) {
+        if (!didCancel) {
+          console.error("Error loading applications:", err);
+          setLastError("Failed to load applications. Please try again.");
+          setToast({
+            open: true,
+            message: `Error: ${err.message || "Failed to load applications"}`,
+            severity: 'error'
+          });
+        }
+      } finally {
+        if (!didCancel) {
+          setLoading(false);
+          setLoadingMessage("");
+        }
+      }
+    };
+    
+    loadApplications();
+    
+    return () => {
+      didCancel = true;
+    };
+  }, [configInitialized, demoMode, tablePage, pageSize, sortField, sortOrder, search, statusFilter, followUpFilter, apiCallsEnabled]);
+
+  // Load visualization data when page changes
+  useEffect(() => {
+    if (page === 'visualizations' && !visualizationData.statusCounts && !visualizationsLoading) {
+      const loadVisualizations = async () => {
+        setVisualizationsLoading(true);
+        try {
+          const data = await fetchVisualizations(demoMode);
+          setVisualizationData(data);
+        } catch (err) {
+          console.error("Error loading visualizations:", err);
+          setToast({
+            open: true,
+            message: `Error: ${err.message || "Failed to load visualizations"}`,
+            severity: 'error'
+          });
+        } finally {
+          setVisualizationsLoading(false);
+        }
+      };
+      
+      loadVisualizations();
+    }
+  }, [page, visualizationData, visualizationsLoading, demoMode]);
+
+  // Handle row click in the data grid
+  const handleRowClick = useCallback((params) => {
+    console.log("Row clicked:", params.row);
+    setSelected(params.row);
+    setViewModalOpen(true);
+  }, []);
+
+  // Open the create new application form
+  const handleNewClick = useCallback(() => {
+    console.log("Creating new application");
+    setSelected(null);
+    setFormModalOpen(true);
+  }, []);
+
+  // Handle viewing an application
+  const handleViewApplication = useCallback((application) => {
+    console.log("Viewing application:", application);
+    setSelected(application);
+    setViewModalOpen(true);
+  }, []);
+
+  // Handle editing an application
+  const handleEditApplication = useCallback((application) => {
+    console.log("Editing application:", application);
+    setSelected(application);
+    setFormModalOpen(true);
+    setViewModalOpen(false);
+  }, []);
+
+  // Handle deleting an application
+  const handleDeleteApplication = useCallback(async (application) => {
+    console.log("Deleting application:", application);
+    
+    if (!application || !application.id) {
+      console.error("Invalid application to delete:", application);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await (demoMode ? deleteApplication(application.id, true) : deleteApplication(application.id));
+      
+      // Update the applications list
+      setApplications((prevApplications) => 
+        prevApplications.filter((app) => app.id !== application.id)
+      );
+      
+      setToast({
+        open: true,
+        message: "Application deleted successfully",
+        severity: 'success'
+      });
+      
+      // Close the modal if open
+      setViewModalOpen(false);
+    } catch (err) {
+      console.error("Error deleting application:", err);
+      setToast({
+        open: true,
+        message: `Error: ${err.message || "Failed to delete application"}`,
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [demoMode]);
+
+  // Handle form submission for creating/updating an application
+  const handleFormSubmit = useCallback(async (data, files) => {
+    console.log("Form submitted with data:", data);
+    console.log("Files:", files);
+    
+    if (!data) {
+      console.error("Invalid form data:", data);
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      let result;
+      
+      if (data.id) {
+        // Update existing application
+        console.log(`Updating application ${data.id} in ${demoMode ? 'demo' : 'regular'} mode`);
+        
+        // First upload any files
+        if (files && Object.keys(files).length > 0) {
+          for (const [fieldName, file] of Object.entries(files)) {
+            if (file) {
+              console.log(`Uploading ${fieldName} file:`, file.name);
+              
+              const fileResult = await uploadFile(
+                data.id, 
+                fieldName, 
+                file,
+                demoMode
+              );
+              
+              // Update the data with the file path
+              data[fieldName] = fileResult.fileName;
+              console.log(`Updated ${fieldName} to:`, fileResult.fileName);
+            }
+          }
+        }
+        
+        // Now update the application
+        result = await updateApplication(data.id, data, demoMode);
+        
+        // Update in the local list
+        setApplications(prevApps => 
+          prevApps.map(app => app.id === data.id ? {...app, ...result} : app)
+        );
+        
+        setToast({
+          open: true,
+          message: "Application updated successfully",
+          severity: 'success'
+        });
+      } else {
+        // Create new application
+        console.log(`Creating new application in ${demoMode ? 'demo' : 'regular'} mode`);
+        result = await createApplication(data, demoMode);
+        
+        // Upload files if needed for the new application
+        if (files && Object.keys(files).length > 0 && result && result.id) {
+          for (const [fieldName, file] of Object.entries(files)) {
+            if (file) {
+              console.log(`Uploading ${fieldName} file for new application:`, file.name);
+              
+              const fileResult = await uploadFile(
+                result.id,
+                fieldName,
+                file,
+                demoMode
+              );
+              
+              // Update the result with the file path
+              result[fieldName] = fileResult.fileName;
+            }
+          }
+          
+          // Update the application with file information
+          if (Object.keys(files).some(k => files[k])) {
+            result = await updateApplication(result.id, result, demoMode);
+          }
+        }
+        
+        // Add to the local list if on the first page
+        if (tablePage === 0) {
+          setApplications(prevApps => [result, ...prevApps]);
+        }
+        
+        setToast({
+          open: true,
+          message: "Application created successfully",
+          severity: 'success'
+        });
+      }
+      
+      setFormModalOpen(false);
+    } catch (err) {
+      console.error("Error submitting form:", err);
+      setToast({
+        open: true,
+        message: `Error: ${err.message || "Failed to save application"}`,
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [demoMode, tablePage]);
+
+  // Handle toast close
+  const handleToastClose = useCallback(() => {
+    setToast((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  // Handle clearing all filters
+  const handleClearFilters = useCallback(() => {
+    console.log("Clearing all filters");
+    resetSearch(); // Clear search term
+    setVisibleColumns([
+      'company', 'role', 'url', 'status', 'application_date', 'follow_up_required'
+    ]); // Reset visible columns
+    setTablePage(0); // Reset to first page
+    setStatusFilter(''); // Clear status filter
+    setFollowUpFilter(''); // Clear follow-up filter
+    setSortField('created_at'); // Reset sort field
+    setSortOrder('desc'); // Reset sort order
+  }, [resetSearch, setVisibleColumns, setTablePage, setStatusFilter, 
+      setFollowUpFilter, setSortField, setSortOrder]);
+
+  // Handle toggling demo mode
+  const handleDemoToggle = useCallback((isDemoMode) => {
+    console.log(`Toggling demo mode to: ${isDemoMode}`);
+    setDemoMode(isDemoMode);
+    // Reset pagination when switching modes
+    setTablePage(0);
+  }, []);
+
+  // Handle "Show All" click
+  const handleShowAll = useCallback(() => {
+    console.log("Show all clicked");
+    setShowAllModalOpen(true);
+  }, []);
+
+  // Export all applications to CSV
+  const handleExportCSV = useCallback(() => {
+    console.log("Exporting to CSV");
+    // Logic to export data to CSV
+    // ...
+  }, []);
+
+  // Render the current page content
+  const renderPage = useCallback(() => {
+    console.log(`Rendering page: ${page}`);
+    
+    switch (page) {
+      case 'applications':
+        return (
+          <JobTable 
+            rows={applications}
+            visibleColumns={visibleColumns}
+            setVisibleColumns={memoizedSetVisibleColumns}
+            loading={loading || searchLoading}
+            search={search}
+            setSearch={setSearch}
+            searchLoading={searchLoading}
+            statusFilter={statusFilter}
+            setStatusFilter={memoizedSetStatusFilter}
+            followUpFilter={followUpFilter}
+            setFollowUpFilter={memoizedSetFollowUpFilter}
+            onClearFilters={handleClearFilters}
+            onRowClick={handleRowClick}
+            onView={handleViewApplication}
+            onShowAll={handleShowAll}
+            page={tablePage}
+            setPage={setTablePage}
+            pageSize={pageSize}
+            setPageSize={setPageSize}
+            totalCount={totalCount}
+            paginationMode="server"
+            sortingMode="server"
+            onSortModelChange={(model) => {
+              if (model.length > 0) {
+                setSortField(model[0].field);
+                setSortOrder(model[0].sort);
+              }
+            }}
+          />
+        );
+      case 'dashboard':
+        return <Dashboard applications={applications} loading={loading} />;
+      case 'visualizations':
+        return (
+          <VisualizationsPage 
+            data={visualizationData} 
+            loading={visualizationsLoading} 
+            demoMode={demoMode}
+          />
+        );
+      case 'export':
+        return <ExportCSV applications={applications} loading={loading} />;
+      case 'calendar':
+        return <Calendar applications={applications} loading={loading} />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return <div>Page Not Found</div>;
+    }
+  }, [
+    page, applications, visibleColumns, memoizedSetVisibleColumns, loading, 
+    searchLoading, search, setSearch, statusFilter, memoizedSetStatusFilter, 
+    followUpFilter, memoizedSetFollowUpFilter, handleClearFilters, handleRowClick, 
+    handleViewApplication, handleShowAll, tablePage, setTablePage, pageSize, 
+    setPageSize, totalCount, setSortField, setSortOrder, visualizationData, 
+    visualizationsLoading, demoMode
+  ]);
+  
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', height: '100vh' }} onClick={preventAllFormSubmissions}>
+        <Sidebar
+          currentPage={page}
+          onNavigate={setPage}
+          onNewClick={handleNewClick}
+        />
+        
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          {/* Demo mode toggle - only show in applications page */}
+          {page === 'applications' && (
+            <DemoToggle
+              checked={demoMode}
+              onChange={handleDemoToggle}
+            />
+          )}
+          
+          {/* Main content area */}
+          <Box 
+            sx={{ 
+              flexGrow: 1, 
+              p: 2, 
+              overflowY: 'auto',
+              backgroundColor: 'background.default'
+            }}
+          >
+            {renderPage()}
+            
+            {/* Add bottom spacer to prevent content from being hidden behind snackbar */}
+            <BottomSpacer />
+          </Box>
+        </Box>
+      </Box>
+      
+      {/* Loading overlay */}
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <CircularProgress size={60} thickness={4} />
+          {loadingMessage && (
+            <Box sx={{ mt: 2, color: 'white', typography: 'h6' }}>
+              {loadingMessage}
+            </Box>
+          )}
+        </Box>
+      )}
+      
+      {/* Toast message */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={6000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleToastClose} severity={toast.severity} sx={{ width: '100%' }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
+      
+      {/* View Application Modal */}
+      <ApplicationViewModal
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        application={selected}
+        onEdit={handleEditApplication}
+        onDelete={handleDeleteApplication}
+        demoMode={demoMode}
+      />
+      
+      {/* Show All Modal */}
+      <ShowAllModal
+        open={showAllModalOpen}
+        onClose={() => setShowAllModalOpen(false)}
+        applications={applications}
+        loading={loading}
+        demoMode={demoMode}
+      />
+
+      {/* Application Form Modal - controlled by formModalOpen state */}
+      <ApplicationFormModal
+        open={formModalOpen}
+        onClose={() => setFormModalOpen(false)}
+        onSubmit={handleFormSubmit}
+        initialData={selected}
+        demoMode={demoMode}
+        applicationId={selected?.id}
+      />
+    </ThemeProvider>
+  );
+}
+
+export default App;

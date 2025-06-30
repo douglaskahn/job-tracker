@@ -288,6 +288,7 @@ function App() {
               const newDemoMode = !demoMode;
               console.log("Toggling demo mode to:", newDemoMode);
               setDemoMode(newDemoMode);
+              // The useEffect hook will handle loading data when demoMode changes
             }} />
           </Box>
           {loading && <CircularProgress sx={{ m: 2 }} />}
@@ -328,6 +329,7 @@ function App() {
                 application={viewedApplication}
                 onEdit={handleModalEdit}
                 onDelete={() => handleModalDelete(viewedApplication)}
+                demoMode={demoMode}
               />
             </>
           )}

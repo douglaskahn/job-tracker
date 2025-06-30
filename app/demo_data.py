@@ -1,9 +1,9 @@
 import random
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from app.demo_models import DemoApplication
-from app.database import SessionLocal, engine
-import app.demo_models as demo_models
+from demo_models import DemoApplication
+from database import SessionLocal, engine
+import demo_models
 import logging
 
 logger = logging.getLogger(__name__)

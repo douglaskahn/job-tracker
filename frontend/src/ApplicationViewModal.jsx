@@ -12,6 +12,8 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { format } from 'date-fns';
+import config from './config';
+import { updateApplication, uploadFile } from './api';
 
 const statusColors = {
   'Not Yet Applied': 'default',
@@ -43,7 +45,7 @@ const FileLink = ({ file, label }) => {
   if (!file) return <Typography color="text.secondary">No {label} uploaded</Typography>;
   
   // Handle both full URLs and local file paths
-  const fileUrl = file.startsWith('http') ? file : `http://localhost:8000/${file}`;
+  const fileUrl = file.startsWith('http') ? file : `${config.api.baseURL}/uploads/${file}`;
   
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -75,7 +77,7 @@ const FileLink = ({ file, label }) => {
   );
 };
 
-export default function ApplicationViewModal({ open, onClose, application, onEdit, onDelete }) {
+export default function ApplicationViewModal({ open, onClose, application, onEdit, onDelete, demoMode = false }) {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -238,10 +240,10 @@ export default function ApplicationViewModal({ open, onClose, application, onEdi
       // Then handle any file uploads if needed
       if (resumeFile || coverLetterFile) {
         if (resumeFile) {
-          await uploadFile(application.id, 'resume', resumeFile);
+          await uploadFile(application.id, 'resume', resumeFile, demoMode);
         }
         if (coverLetterFile) {
-          await uploadFile(application.id, 'cover_letter', coverLetterFile);
+          await uploadFile(application.id, 'cover_letter', coverLetterFile, demoMode);
         }
       }
       

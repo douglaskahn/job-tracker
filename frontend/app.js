@@ -1,7 +1,7 @@
 // Fetch and display job applications
 async function fetchJobApplications() {
     try {
-        const response = await fetch('http://localhost:8000/applications');
+        const response = await fetch('http://localhost:8005/applications');
         const applications = await response.json();
         displayJobApplications(applications);
     } catch (error) {
@@ -74,7 +74,7 @@ document.getElementById('application-form').addEventListener('submit', async (ev
     formData.append('cover_letter', document.getElementById('cover-letter').files[0]);
 
     try {
-        const response = await fetch('http://localhost:8000/applications/', {
+        const response = await fetch('http://localhost:8005/applications/', {
             method: 'POST',
             body: formData,
         });

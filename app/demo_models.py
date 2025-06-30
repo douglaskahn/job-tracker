@@ -2,7 +2,7 @@ from sqlalchemy import Boolean, Column, Integer, String, DateTime, Date, Foreign
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from app.database import Base
+from database import Base
 
 class DemoApplication(Base):
     __tablename__ = "demo_applications"
